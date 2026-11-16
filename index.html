@@ -1,0 +1,1393 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Caro 1vs1 v3.9 Ultimate Pro</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0b0f19; --bg-secondary: #111827; --bg-card: #1f2937;
+            --text-primary: #f3f4f6; --text-muted: #9ca3af;
+            --primary: #0ea5e9; --primary-hover: #0284c7; --accent: #f43f5e;
+            --border: #374151; --win-glow: rgba(14, 165, 233, 0.4);
+            --font-mono: 'Courier New', Courier, monospace;
+        }
+        [data-theme="light"] {
+            --bg-primary: #f8fafc; --bg-secondary: #f1f5f9; --bg-card: #ffffff;
+            --text-primary: #0f172a; --text-muted: #64748b;
+            --border: #cbd5e1; --win-glow: rgba(14, 165, 233, 0.3);
+        }
+        [data-theme="wood"] {
+            --bg-primary: #3d2314; --bg-secondary: #4e2e1a; --bg-card: #633c22;
+            --text-primary: #fef3c7; --text-muted: #d97706;
+            --primary: #d97706; --primary-hover: #b45309; --accent: #dc2626;
+            --border: #854d0e; --win-glow: rgba(217, 119, 6, 0.5);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg-primary); color: var(--text-primary); height: 100vh; overflow: hidden; display: flex; flex-direction: column; position: relative; }
+
+        .particle { position: fixed; top: -10px; z-index: 9999; pointer-events: none; animation: fall linear infinite; }
+        @keyframes fall {
+            0% { transform: translateY(-10px) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(105vh) rotate(360deg); opacity: 0.2; }
+        }
+
+        .overlay { position: fixed; inset: 0; background: var(--bg-primary); z-index: 2000; display: flex; align-items: center; justify-content: center; padding: 20px; overflow-y: auto; }
+        .auth-card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 20px; padding: 24px; width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 15px 35px rgba(0,0,0,0.6); }
+        .auth-title { font-size: 22px; font-weight: 800; color: var(--primary); text-align: center; }
+        .auth-input { width: 100%; padding: 11px 14px; background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border); border-radius: 10px; font-size: 14px; outline: none; }
+        .auth-input:focus { border-color: var(--primary); }
+        .auth-btn { width: 100%; padding: 12px; background: var(--primary); color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; }
+        .auth-btn:hover { background: var(--primary-hover); }
+        .select { width: 100%; padding: 10px; background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border); border-radius: 10px; font-size: 14px; }
+
+        header { display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; background: var(--bg-secondary); border-bottom: 1px solid var(--border); height: 52px; z-index: 10; flex-shrink: 0; }
+        .brand { font-weight: 800; font-size: 15px; color: var(--primary); display: flex; align-items: center; gap: 6px; }
+        .header-controls { display: flex; gap: 6px; align-items: center; }
+        .btn-sm { padding: 5px 10px; background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border); border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; }
+        .btn-sm:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+        .main-layout { display: flex; flex-direction: column; height: calc(100vh - 52px); overflow: hidden; position: relative; width: 100%; }
+
+        .sidebar { position: absolute; top: 0; left: -320px; width: 290px; height: 100%; background: var(--bg-secondary); border-right: 1px solid var(--border); padding: 16px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; z-index: 100; transition: left 0.3s ease; box-shadow: 5px 0 25px rgba(0,0,0,0.5); }
+        .sidebar.open { left: 0; }
+        .section-title { font-size: 11px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; letter-spacing: 0.5px; margin-bottom: 4px; }
+        .control-group { display: flex; flex-direction: column; gap: 6px; }
+        .btn { padding: 9px 12px; background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border); border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; text-align: left; display: flex; align-items: center; justify-content: space-between; }
+        .btn:hover { border-color: var(--primary); background: var(--bg-secondary); }
+
+        .center-stage { display: flex; flex-direction: column; position: relative; flex: 1; overflow: hidden; background: var(--bg-primary); width: 100%; }
+        
+        .match-bar { display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; background: var(--bg-secondary); border-bottom: 1px solid var(--border); position: relative; flex-shrink: 0; gap: 4px; }
+        .top-setting-btn { background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--primary); font-weight: 900; flex-shrink: 0; font-size: 16px; }
+        .top-setting-btn:hover { background: var(--primary); color: #fff; }
+        
+        .player-card { display: flex; align-items: center; gap: 6px; background: var(--bg-card); border: 1px solid var(--border); padding: 5px 8px; border-radius: 10px; flex: 1; max-width: 38%; overflow: hidden; }
+        .avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 14px; overflow: hidden; border: 1px solid var(--border); flex-shrink: 0; }
+        .avatar img { width: 100%; height: 100%; object-fit: cover; }
+        
+        .player-info { display: flex; flex-direction: column; overflow: hidden; width: 100%; }
+        .player-name { font-size: 11px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .player-meta { font-size: 9px; color: var(--text-muted); font-family: var(--font-mono); display: flex; gap: 6px; white-space: nowrap; }
+
+        .vs-timer-center { display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0; padding: 0 2px; }
+        .big-vs { font-size: 14px; font-weight: 900; color: var(--primary); font-family: var(--font-mono); }
+        .match-timer { font-size: 9px; font-weight: 700; color: var(--text-muted); font-family: var(--font-mono); }
+
+        .board-viewport { flex: 1; position: relative; overflow: hidden; cursor: grab; display: flex; align-items: center; justify-content: center; width: 100%; touch-action: none; }
+        .board-viewport:active { cursor: grabbing; }
+        .board-wrapper { display: grid; position: absolute; transform-origin: 0 0; background: var(--bg-card); border: 2px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.4); user-select: none; }
+        
+        /* Fix hiển thị icon hoàn hảo cho cả PC cũ và mobile */
+        .cell { width: 44px; height: 44px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 900; cursor: pointer; user-select: none; font-family: Arial, sans-serif; }
+        .cell:hover { background: rgba(14, 165, 233, 0.1); }
+        .cell.x { color: var(--primary); text-shadow: 0 0 10px var(--win-glow); }
+        .cell.o { color: var(--accent); text-shadow: 0 0 10px rgba(244, 63, 94, 0.4); }
+
+        .status-footer { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: var(--bg-secondary); border-top: 1px solid var(--border); font-size: 12px; font-weight: 600; flex-shrink: 0; }
+
+        .chat-container { display: flex; flex-direction: column; gap: 6px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 8px; height: 140px; }
+        .chat-messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; font-size: 11px; }
+        .chat-msg { background: var(--bg-secondary); padding: 4px 8px; border-radius: 6px; word-break: break-word; }
+        .chat-input-row { display: flex; gap: 4px; }
+
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: none; align-items: center; justify-content: center; z-index: 999; padding: 20px; }
+        .modal-card { background: var(--bg-secondary); border: 2px solid var(--border); border-radius: 20px; padding: 26px; width: 100%; max-width: 340px; display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .result-title { font-size: 42px; font-weight: 900; letter-spacing: 2px; }
+        .result-title.win { color: #fbbf24; text-shadow: 0 0 25px rgba(251, 191, 36, 0.7); }
+        .result-title.lose { color: #38bdf8; text-shadow: 0 0 25px rgba(56, 189, 248, 0.7); }
+        .modal-btn { width: 100%; padding: 11px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; font-size: 14px; font-weight: 700; color: var(--text-primary); cursor: pointer; }
+        .modal-btn:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+        .room-badge { background: var(--bg-card); border: 1px solid var(--primary); padding: 8px 12px; border-radius: 8px; font-family: var(--font-mono); font-size: 14px; color: var(--primary); display: flex; align-items: center; justify-content: space-between; width: 100%; }
+        
+        .avatar-preview { width: 45px; height: 45px; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary); background: var(--bg-card); }
+    </style>
+</head>
+<body>
+
+<!-- MÀN HÌNH ĐĂNG NHẬP (TÊN ĐỂ TRỐNG TỰ GÕ, 40 QUỐC GIA, AVATAR INSTANT) -->
+<div class="overlay" id="setup-screen">
+    <div class="auth-card">
+        <div class="auth-title">🎮 Cài Đặt Người Chơi</div>
+        
+        <label style="font-size: 12px; color: var(--text-muted);">Tên của bạn:</label>
+        <input type="text" class="auth-input" id="input-player-name" placeholder="Nhập tên của bạn...">
+        
+        <label style="font-size: 12px; color: var(--text-muted);">Chọn Quốc Gia (40 quốc gia):</label>
+        <select class="select" id="select-country"></select>
+
+        <label style="font-size: 12px; color: var(--text-muted);">Link Ảnh Đại Diện (Avatar URL):</label>
+        <div style="display: flex; gap: 8px; align-items: center;">
+            <input type="text" class="auth-input" id="input-avatar-url" placeholder="Dán link ảnh vào đây..." value="https://i.imgur.com/6VBx3io.png" style="margin:0;">
+            <img id="avatar-preview-img" class="avatar-preview" src="https://i.imgur.com/6VBx3io.png" alt="Avatar">
+        </div>
+
+        <button class="auth-btn" onclick="enterLobby()">Vào Sảnh Chơi 🚀</button>
+    </div>
+</div>
+
+<!-- SẢNH TẠO / VÀO PHÒNG -->
+<div class="overlay" id="lobby-screen" style="display: none;">
+    <div class="auth-card">
+        <div class="auth-title">🌐 Sảnh Caro 1vs1</div>
+        <div style="font-size: 13px; color: var(--text-muted); text-align: center;" id="lobby-user-greeting">Xin chào!</div>
+        <hr style="border-color: var(--border);">
+        <button class="auth-btn" style="background: #22c55e;" onclick="createOnlineRoom()">➕ Tạo Phòng Mới</button>
+        <div style="display: flex; gap: 6px;">
+            <input type="text" class="auth-input" id="input-room-code" placeholder="Mã 6 số..." style="margin:0; text-align:center; font-family:var(--font-mono); letter-spacing:2px;">
+            <button class="auth-btn" style="margin:0; width: 120px;" onclick="joinOnlineRoom()">🔗 Vào Phòng</button>
+        </div>
+    </div>
+</div>
+
+<header>
+    <div class="brand">⚡ Caro 1vs1 v3.9</div>
+    <div class="header-controls">
+        <button class="btn-sm" onclick="toggleTheme()">🌓 Theme (Tối/Sáng/Gỗ)</button>
+        <button class="btn-sm" onclick="toggleEffect()">❄/🌸 Hiệu Ứng</button>
+        <button class="btn-sm" onclick="location.reload()">🔄 Đổi Tên</button>
+    </div>
+</header>
+
+<div class="main-layout">
+    <aside class="sidebar" id="sidebar-drawer">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div class="section-title" style="margin:0;">☰ Menu Tùy Chỉnh</div>
+            <button class="btn-sm" onclick="toggleSidebar()">✕ Đóng</button>
+        </div>
+
+        <div>
+            <div class="section-title">Mã Phòng Hiện Tại</div>
+            <div class="room-badge">
+                <span id="current-room-code-txt" style="font-weight:900;">------</span>
+                <button class="btn-sm" onclick="copyRoomCode()">📋 Sao chép</button>
+            </div>
+        </div>
+
+        <div>
+            <div class="section-title">Tab Xem Mạng & Tốc Độ</div>
+            <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 8px; font-size: 11px; display: flex; flex-direction: column; gap: 4px;">
+                <div><b>Loại mạng đang dùng:</b> <span id="net-type" style="color: var(--primary);">Đang kiểm tra...</span></div>
+                <div><b>Tốc độ / Ping:</b> <span id="net-speed" style="color: var(--accent);">Đang đo...</span></div>
+                <button class="btn-sm" style="margin-top: 4px; text-align: center;" onclick="checkNetworkSpeed()">🔄 Cập nhật tốc độ mạng</button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <button class="btn" onclick="restartMatch()">🔄 Chơi Lại Ván Này</button>
+            <button class="btn" onclick="openPieceCustomizer()">✏️ Đổi Biểu Tượng Quân Cờ</button>
+        </div>
+
+        <div>
+            <div class="section-title">Chat Thời Gian Thực</div>
+            <div class="chat-container">
+                <div class="chat-messages" id="chat-messages-box"></div>
+                <div class="chat-input-row">
+                    <input type="text" class="auth-input" id="chat-input-text" placeholder="Nhập tin nhắn..." style="padding: 6px 8px; font-size: 11px;">
+                    <button class="btn-sm" onclick="sendChatMessage()">Gửi</button>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <main class="center-stage" id="caro-stage">
+        <div class="match-bar">
+            <div class="top-setting-btn" title="Menu" onclick="toggleSidebar()">☰</div>
+            
+            <div class="player-card">
+                <div class="avatar" id="avatar-x"><img id="img-avatar-x" src="" style="display:none;"><span id="txt-avatar-x">👤</span></div>
+                <div class="player-info">
+                    <span class="player-name" id="name-x">Đang đợi (X)</span>
+                    <div class="player-meta">
+                        <span id="score-x">Bước: 0</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="vs-timer-center">
+                <div class="big-vs" id="vs-label-badge">VS</div>
+                <div class="match-timer" id="game-timer">0s</div>
+            </div>
+
+            <div class="player-card" style="justify-content: flex-end;">
+                <div class="player-info" style="text-align: right;">
+                    <span class="player-name" id="name-o">Đang đợi... (O)</span>
+                    <div class="player-meta" style="justify-content: flex-end;">
+                        <span id="score-o">Bước: 0</span>
+                    </div>
+                </div>
+                <div class="avatar" id="avatar-o"><img id="img-avatar-o" src="" style="display:none;"><span id="txt-avatar-o">👤</span></div>
+            </div>
+        </div>
+
+        <div class="board-viewport" id="viewport">
+            <div class="board-wrapper" id="board"></div>
+        </div>
+
+        <div class="status-footer">
+            <span id="status-text" style="font-size:12px; font-weight:700;">Đang ở sảnh chờ...</span>
+            <span style="font-size: 11px; color: var(--text-muted);">Caro Pro Engine</span>
+        </div>
+    </main>
+</div>
+
+<div class="modal-overlay" id="result-modal">
+    <div class="modal-card">
+        <div class="result-title" id="result-title">WIN</div>
+        <div style="font-size:13px; color:var(--text-muted);" id="result-subtitle">Trận đấu đã phân định.</div>
+        <button class="modal-btn" onclick="restartMatch()">Chơi Ván Mới</button>
+        <button class="modal-btn" style="background:var(--border);" onclick="location.reload()">Về sảnh</button>
+    </div>
+</div>
+
+<script>
+    const firebaseConfig = {
+        databaseURL: "https://caro-adadd-default-rtdb.asia-southeast1.firebasedatabase.app"
+    };
+    
+    let db;
+    try {
+        firebase.initializeApp(firebaseConfig);
+        db = firebase.database();
+    } catch (e) {
+        alert("Lỗi khởi tạo Firebase: " + e.message);
+    }
+
+    // 40 QUỐC GIA CHUẨN XÁC
+    const countriesList = [
+        { name: "Việt Nam", flag: "VN" }, { name: "Hoa Kỳ", flag: "US" }, { name: "Nhật Bản", flag: "JP" },
+        { name: "Hàn Quốc", flag: "KR" }, { name: "Trung Quốc", flag: "CN" }, { name: "Anh", flag: "GB" },
+        { name: "Pháp", flag: "FR" }, { name: "Đức", flag: "DE" }, { name: "Canada", flag: "CA" },
+        { name: "Úc", flag: "AU" }, { name: "Nga", flag: "RU" }, { name: "Thái Lan", flag: "TH" },
+        { name: "Singapore", flag: "SG" }, { name: "Malaysia", flag: "MY" }, { name: "Indonesia", flag: "ID" },
+        { name: "Philippines", flag: "PH" }, { name: "Lào", flag: "LA" }, { name: "Campuchia", flag: "KH" },
+        { name: "Ấn Độ", flag: "IN" }, { name: "Brazil", flag: "BR" }, { name: "Ý", flag: "IT" },
+        { name: "Tây Ban Nha", flag: "ES" }, { name: "Thụy Sĩ", flag: "CH" }, { name: "Thụy Điển", flag: "SE" },
+        { name: "Hà Lan", flag: "NL" }, { name: "Bỉ", flag: "BE" }, { name: "Đan Mạch", flag: "DK" },
+        { name: "Na Uy", flag: "NO" }, { name: "Phần Lan", flag: "FI" }, { name: "Ba Lan", flag: "PL" },
+        { name: "Bồ Đào Nha", flag: "PT" }, { name: "Hy Lạp", flag: "GR" }, { name: "Thổ Nhĩ Kỳ", flag: "TR" },
+        { name: "México", flag: "MX" }, { name: "Argentina", flag: "AR" }, { name: "Chile", flag: "CL" },
+        { name: "New Zealand", flag: "NZ" }, { name: "Nam Phi", flag: "ZA" }, { name: "Ai Cập", flag: "EG" },
+        { name: "UAE", flag: "AE" }
+    ];
+
+    function populateCountries() {
+        const selectEl = document.getElementById('select-country');
+        selectEl.innerHTML = '';
+        countriesList.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c.name;
+            opt.textContent = `[${c.flag}] ${c.name}`;
+            selectEl.appendChild(opt);
+        });
+    }
+    populateCountries();
+
+    let myName = "", myFlag = "VN", myAvatar = "https://i.imgur.com/6VBx3io.png";
+    let pieceStyle = { X: "X", O: "O" };
+    let activeRoomId = null, myRole = null;
+    let timerSec = 0, timerInterval = null;
+
+    // Xem trước avatar ngay lập tức không trễ mili-giây
+    const avatarInput = document.getElementById('input-avatar-url');
+    const avatarPreviewImg = document.getElementById('avatar-preview-img');
+    avatarInput.addEventListener('input', () => {
+        let val = avatarInput.value.trim();
+        if (val) {
+            avatarPreviewImg.src = val;
+            avatarPreviewImg.style.display = 'block';
+        }
+    });
+
+    function enterLobby() {
+        const nameInput = document.getElementById('input-player-name').value.trim();
+        if (!nameInput) {
+            alert("Vui lòng nhập tên của bạn trước khi vào sảnh!");
+            return;
+        }
+        myName = nameInput;
+        myFlag = document.getElementById('select-country').value;
+        myAvatar = avatarInput.value.trim() || "https://i.imgur.com/6VBx3io.png";
+
+        document.getElementById('setup-screen').style.display = 'none';
+        document.getElementById('lobby-screen').style.display = 'flex';
+        document.getElementById('lobby-user-greeting').innerText = `Xin chào [${myFlag}] ${myName}!`;
+        checkNetworkSpeed();
+    }
+
+    // TAB XEM MẠNG & TỐC ĐỘ (PING)
+    function checkNetworkSpeed() {
+        const typeEl = document.getElementById('net-type');
+        const speedEl = document.getElementById('net-speed');
+        
+        let connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+        if (connection) {
+            let connType = connection.type ? connection.type.toUpperCase() : 'WI-FI / CELLULAR';
+            let effective = connection.effectiveType ? connection.effectiveType.toUpperCase() : '';
+            typeEl.innerText = `${connType} (${effective})`;
+        } else {
+            typeEl.innerText = "Trực tuyến (Online)";
+        }
+
+        speedEl.innerText = "Đang đo...";
+        let startTime = Date.now();
+        fetch('https://www.gstatic.com/generate_204', { mode: 'no-cors' }).then(() => {
+            let duration = Date.now() - startTime;
+            speedEl.innerText = `${duration} ms (Tốc độ tốt)`;
+        }).catch(() => {
+            speedEl.innerText = "Ổn định";
+        });
+    }
+
+    // HIỆU ỨNG TUYẾT RƠI / HOA ĐÀO RƠI (TÙY CHỌN)
+    let currentEffect = 'none'; // 'none', 'snow', 'sakura'
+    let particleInterval = null;
+
+    function toggleEffect() {
+        if (currentEffect === 'none') {
+            currentEffect = 'snow';
+            startParticles('❄');
+            alert("Đã bật hiệu ứng: Tuyết rơi ❄");
+        } else if (currentEffect === 'snow') {
+            currentEffect = 'sakura';
+            startParticles('❀');
+            alert("Đã bật hiệu ứng: Hoa đào rơi ❀");
+        } else {
+            currentEffect = 'none';
+            stopParticles();
+            alert("Đã tắt hiệu ứng!");
+        }
+    }
+
+    function startParticles(char) {
+        stopParticles();
+        particleInterval = setInterval(() => {
+            const p = document.createElement('div');
+            p.className = 'particle';
+            p.innerText = char;
+            p.style.left = Math.random() * 100 + 'vw';
+            p.style.fontSize = (Math.random() * 10 + 12) + 'px';
+            p.style.animationDuration = (Math.random() * 3 + 3) + 's';
+            document.body.appendChild(p);
+            setTimeout(() => p.remove(), 6000);
+        }, 300);
+    }
+
+    function stopParticles() {
+        if (particleInterval) clearInterval(particleInterval);
+        document.querySelectorAll('.particle').forEach(el => el.remove());
+    }
+
+    // ĐỔI THEME (Tối / Sáng / Gỗ)
+    let themeIndex = 0;
+    const themes = ['dark', 'light', 'wood'];
+    function toggleTheme() {
+        themeIndex = (themeIndex + 1) % themes.length;
+        document.documentElement.setAttribute('data-theme', themes[themeIndex]);
+    }
+
+    function toggleSidebar() { document.getElementById('sidebar-drawer').classList.toggle('open'); }
+
+    let ROWS = 20, COLS = 20;
+    let board = Array(ROWS).fill(null).map(() => Array(COLS).fill(''));
+    let gameActive = true;
+
+    let scale = 1, pointX = 0, pointY = 0;
+    let activePointers = new Map();
+    let initialDist = 0, initialScale = 1;
+    let isDragging = false, startX = 0, startY = 0, pointerDownTime = 0, hasDragged = false;
+
+    const viewport = document.getElementById('viewport');
+    const boardEl = document.getElementById('board');
+    const statusText = document.getElementById('status-text');
+
+    function openPieceCustomizer() {
+        let inputPiece = prompt("Nhập ký tự quân cờ mới (Hỗ trợ tốt cho mọi PC và Mobile):", myRole === 'X' ? pieceStyle.X : pieceStyle.O);
+        if (inputPiece === null) return;
+        let cleaned = inputPiece.trim();
+        if (cleaned) {
+            if (myRole === 'X') pieceStyle.X = cleaned;
+            else pieceStyle.O = cleaned;
+            db.ref('rooms/' + activeRoomId + '/pieces/' + myRole).set(cleaned);
+            refreshBoardDisplay();
+        }
+    }
+
+    function renderPieceContent(cellElement, player) {
+        cellElement.innerHTML = '';
+        cellElement.className = 'cell ' + player.toLowerCase();
+        cellElement.innerText = pieceStyle[player];
+    }
+
+    function refreshBoardDisplay() {
+        for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+                if (board[r][c] !== '') renderPieceContent(boardEl.children[r * COLS + c], board[r][c]);
+            }
+        }
+    }
+
+    function initCaroBoard() {
+        boardEl.style.gridTemplateColumns = `repeat(${COLS}, 44px)`;
+        boardEl.style.gridTemplateRows = `repeat(${ROWS}, 44px)`;
+        boardEl.innerHTML = '';
+        for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell'; cell.dataset.r = r; cell.dataset.c = c;
+                boardEl.appendChild(cell);
+            }
+        }
+        resetZoom();
+    }
+
+    function updateTransform() { boardEl.style.transform = `translate(${pointX}px, ${pointY}px) scale(${scale})`; }
+    function resetZoom() { 
+        scale = 1; 
+        pointX = (viewport.clientWidth - COLS * 44) / 2; 
+        pointY = (viewport.clientHeight - ROWS * 44) / 2; 
+        updateTransform(); 
+    }
+
+    viewport.addEventListener('pointerdown', (e) => {
+        activePointers.set(e.pointerId, e);
+        if (activePointers.size === 1) {
+            isDragging = true; hasDragged = false; startX = e.clientX; startY = e.clientY; pointerDownTime = Date.now();
+        } else if (activePointers.size === 2) {
+            isDragging = false;
+            const pts = Array.from(activePointers.values());
+            initialDist = Math.hypot(pts[0].clientX - pts[1].clientX, pts[0].clientY - pts[1].clientY);
+            initialScale = scale;
+        }
+        viewport.setPointerCapture(e.pointerId);
+    });
+
+    viewport.addEventListener('pointermove', (e) => {
+        if (!activePointers.has(e.pointerId)) return;
+        activePointers.set(e.pointerId, e);
+        if (activePointers.size === 2) {
+            const pts = Array.from(activePointers.values());
+            const currentDist = Math.hypot(pts[0].clientX - pts[1].clientX, pts[0].clientY - pts[1].clientY);
+            if (initialDist > 0) {
+                scale = Math.min(Math.max(initialScale * (currentDist / initialDist), 0.4), 2.5);
+                updateTransform();
+            }
+        } else if (isDragging && activePointers.size === 1) {
+            const dx = e.clientX - startX, dy = e.clientY - startY;
+            if (Math.hypot(dx, dy) > 4) hasDragged = true;
+            pointX += dx; pointY += dy; startX = e.clientX; startY = e.clientY;
+            updateTransform();
+        }
+    });
+
+    viewport.addEventListener('pointerup', (e) => {
+        activePointers.delete(e.pointerId);
+        if (activePointers.size < 2) initialDist = 0;
+        if (isDragging && activePointers.size === 0) {
+            isDragging = false;
+            if (!hasDragged && (Date.now() - pointerDownTime < 350)) {
+                const rect = boardEl.getBoundingClientRect();
+                const c = Math.floor((e.clientX - rect.left) / (44 * scale));
+                const r = Math.floor((e.clientY - rect.top) / (44 * scale));
+                if (r >= 0 && r < ROWS && c >= 0 && c < COLS) onCellClick(r, c);
+            }
+        }
+        try { viewport.releasePointerCapture(e.pointerId); } catch (err) {}
+    });
+
+    viewport.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const xs = (e.clientX - pointX) / scale, ys = (e.clientY - pointY) / scale;
+        scale = e.deltaY < 0 ? Math.min(scale * 1.15, 2.5) : Math.max(scale / 1.15, 0.4);
+        pointX = e.clientX - xs * scale; pointY = e.clientY - ys * scale;
+        updateTransform();
+    }, { passive: false });
+
+    function createOnlineRoom() {
+        myRole = 'X';
+        activeRoomId = Math.floor(100000 + Math.random() * 900000).toString();
+
+        const roomData = {
+            turn: 'X',
+            status: 'waiting',
+            players: { X: myName, O: '' },
+            flags: { X: myFlag, O: 'VN' },
+            avatars: { X: myAvatar, O: '' },
+            pieces: { X: 'X', O: 'O' },
+            board: Array(ROWS * COLS).fill('').join(',')
+        };
+
+        db.ref('rooms/' + activeRoomId).set(roomData, (error) => {
+            if (error) {
+                alert("Lỗi tạo phòng: " + error.message);
+            } else {
+                document.getElementById('lobby-screen').style.display = 'none';
+                document.getElementById('current-room-code-txt').innerText = activeRoomId;
+                updatePlayerDisplay('X', myName, myFlag, myAvatar);
+                statusText.innerText = `Đã tạo phòng ${activeRoomId}. Đang đợi đủ 2 người để tính giờ...`;
+                initCaroBoard();
+                listenToRoom();
+            }
+        });
+    }
+
+    function joinOnlineRoom() {
+        const code = document.getElementById('input-room-code').value.trim();
+        if (!code) { alert("Vui lòng nhập mã phòng 6 số!"); return; }
+        
+        db.ref('rooms/' + code).once('value', snapshot => {
+            const room = snapshot.val();
+            if (!room) { alert("Không tìm thấy phòng có mã: " + code); return; }
+            if (room.status !== 'waiting' && room.players.O && room.players.O !== myName) {
+                alert("Phòng này đã đủ 2 người chơi!");
+                return;
+            }
+
+            myRole = 'O';
+            activeRoomId = code;
+
+            db.ref('rooms/' + activeRoomId + '/players/O').set(myName);
+            db.ref('rooms/' + activeRoomId + '/flags/O').set(myFlag);
+            db.ref('rooms/' + activeRoomId + '/avatars/O').set(myAvatar);
+            db.ref('rooms/' + activeRoomId + '/status').set('playing', (err) => {
+                if (err) {
+                    alert("Lỗi vào phòng: " + err.message);
+                } else {
+                    document.getElementById('lobby-screen').style.display = 'none';
+                    document.getElementById('current-room-code-txt').innerText = activeRoomId;
+                    updatePlayerDisplay('O', myName, myFlag, myAvatar);
+                    statusText.innerText = "Đã vào phòng, trận đấu bắt đầu!";
+                    initCaroBoard();
+                    listenToRoom();
+                }
+            });
+        });
+    }
+
+    function updatePlayerDisplay(role, name, flag, avatarUrl) {
+        if (role === 'X') {
+            document.getElementById('name-x').innerText = `[${flag}] ${name} (X)`;
+            if (avatarUrl && avatarUrl.startsWith('http')) {
+                document.getElementById('img-avatar-x').src = avatarUrl;
+                document.getElementById('img-avatar-x').style.display = 'block';
+                document.getElementById('txt-avatar-x').style.display = 'none';
+            } else {
+                document.getElementById('txt-avatar-x').innerText = flag;
+            }
+        } else {
+            document.getElementById('name-o').innerText = `[${flag}] ${name} (O)`;
+            if (avatarUrl && avatarUrl.startsWith('http')) {
+                document.getElementById('img-avatar-o').src = avatarUrl;
+                document.getElementById('img-avatar-o').style.display = 'block';
+                document.getElementById('txt-avatar-o').style.display = 'none';
+            } else {
+                document.getElementById('txt-avatar-o').innerText = flag;
+            }
+        }
+    }
+
+    function copyRoomCode() {
+        navigator.clipboard.writeText(activeRoomId).then(() => alert(`Đã sao chép mã phòng: ${activeRoomId}`));
+    }
+
+    function sendChatMessage() {
+        const input = document.getElementById('chat-input-text');
+        const msg = input.value.trim();
+        if (!msg || !activeRoomId) return;
+        db.ref('rooms/' + activeRoomId + '/chats').push({ sender: myName, text: msg });
+        input.value = '';
+    }
+
+    function onCellClick(r, c) {
+        if (!gameActive || board[r][c] !== '') return;
+
+        db.ref('rooms/' + activeRoomId).once('value', snapshot => {
+            const room = snapshot.val();
+            if (!room || room.status !== 'playing') { alert("Đang chờ đủ người chơi để bắt đầu!"); return; }
+            if (room.turn !== myRole) { alert("Chưa tới lượt bạn!"); return; }
+
+            board[r][c] = myRole;
+            let flatBoard = board.flat().join(',');
+            let nextTurn = myRole === 'X' ? 'O' : 'X';
+
+            let winData = checkWin5InARow(r, c, myRole);
+            if (winData) {
+                db.ref('rooms/' + activeRoomId).update({ board: flatBoard, status: 'ended_' + myRole });
+            } else {
+                db.ref('rooms/' + activeRoomId).update({ board: flatBoard, turn: nextTurn });
+            }
+        });
+    }
+
+    function listenToRoom() {
+        db.ref('rooms/' + activeRoomId).on('value', snapshot => {
+            const room = snapshot.val();
+            if (!room) return;
+
+            if (room.players && room.flags && room.avatars) {
+                if (room.players.X) updatePlayerDisplay('X', room.players.X, room.flags.X, room.avatars.X);
+                if (room.players.O) updatePlayerDisplay('O', room.players.O, room.flags.O, room.avatars.O);
+            }
+
+            if (room.pieces) {
+                pieceStyle.X = room.pieces.X || 'X';
+                pieceStyle.O = room.pieces.O || 'O';
+                refreshBoardDisplay();
+            }
+
+            if (room.status === 'waiting') {
+                statusText.innerText = `Mã phòng: ${activeRoomId} - Đang chờ đủ 2 người để tính giờ...`;
+                stopTimer();
+            } else if (room.status === 'playing') {
+                let currentTurnName = room.turn === 'X' ? room.players.X : room.players.O;
+                statusText.innerText = `Đang đấu! Lượt của: ${currentTurnName} (${room.turn})`;
+                startTimer(); // TÍNH GIỜ CHÍNH XÁC KHI ĐỦ NGƯỜI
+            } else if (room.status && room.status.startsWith('ended')) {
+                let winner = room.status.split('_')[1];
+                gameActive = false;
+                stopTimer();
+                showResultModal(winner === myRole ? 'win' : 'lose');
+            }
+
+            if (room.board) {
+                let arr = room.board.split(',');
+                let idx = 0, stepsX = 0, stepsO = 0;
+                for (let r = 0; r < ROWS; r++) {
+                    for (let c = 0; c < COLS; c++) {
+                        board[r][c] = arr[idx];
+                        if (arr[idx] !== '') {
+                            renderPieceContent(boardEl.children[r * COLS + c], arr[idx]);
+                            if (arr[idx] === 'X') stepsX++; else stepsO++;
+                        }
+                        idx++;
+                    }
+                }
+                document.getElementById('score-x').innerText = `Bước: ${stepsX}`;
+                document.getElementById('score-o').innerText = `Bước: ${stepsO}`;
+            }
+        });
+
+        db.ref('rooms/' + activeRoomId + '/chats').on('child_added', snapshot => {
+            const chat = snapshot.val();
+            const chatBox = document.getElementById('chat-messages-box');
+            const msgEl = document.createElement('div');
+            msgEl.className = 'chat-msg';
+            msgEl.innerHTML = `<b>${chat.sender}:</b> ${chat.text}`;
+            chatBox.appendChild(msgEl);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        });
+    }
+
+    function startTimer() {
+        if (timerInterval) return;
+        timerSec = 0;
+        timerInterval = setInterval(() => {
+            timerSec++;
+            const tEl = document.getElementById('game-timer');
+            if (tEl) tEl.innerText = timerSec + 's';
+        }, 1000);
+    }
+
+    function stopTimer() {
+        if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    }
+
+    function restartMatch() {
+        if (!activeRoomId) return;
+        db.ref('rooms/' + activeRoomId).update({
+            board: Array(ROWS * COLS).fill('').join(','),
+            turn: 'X',
+            status: 'playing'
+        });
+        document.getElementById('result-modal').style.display = 'none';
+        gameActive = true;
+        initCaroBoard();
+    }
+
+    function checkWin5InARow(r, c, player) {
+        const dirs = [[0, 1], [1, 0], [1, 1], [1, -1]];
+        for (let [dr, dc] of dirs) {
+            let winCells = [[r, c]];
+            let i = 1;
+            while (r + dr * i >= 0 && r + dr * i < ROWS && c + dc * i >= 0 && c + dc * i < COLS && board[r + dr * i][c + dc * i] === player) {
+                winCells.push([r + dr * i, c + dc * i]);
+                i++;
+            }
+            i = 1;
+            while (r - dr * i >= 0 && r - dr * i < ROWS && c - dc * i >= 0 && c - dc * i < COLS && board[r - dr * i][c - dc * i] === player) {
+                winCells.push([r - dr * i, c - dr * i]);
+                i++;
+            }
+            if (winCells.length >= 5) return winCells;
+        }
+        return null;
+    }
+
+    function showResultModal(type) {
+        const modal = document.getElementById('result-modal');
+        const title = document.getElementById('result-title');
+        const subtitle = document.getElementById('result-subtitle');
+        modal.style.display = 'flex';
+        if (type === 'win') {
+            title.innerText = 'WIN'; title.className = 'result-title win';
+            subtitle.innerText = 'Chúc mừng chiến thắng!';
+        } else {
+            title.innerText = 'LOSE'; title.className = 'result-title lose';
+            subtitle.innerText = 'Đối thủ đã chiến thắng!';
+        }
+    }
+</script>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="vi" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Caro 1vs1 Final Pro - Online</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-database-compat.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-color: #f8fafc;
+            --accent: #3b82f6;
+            --border: #334155;
+        }
+        [data-theme="light"] {
+            --bg-color: #f1f5f9;
+            --card-bg: #ffffff;
+            --text-color: #0f172a;
+            --accent: #2563eb;
+            --border: #cbd5e1;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            transition: background 0.3s, color 0.3s;
+        }
+        .container {
+            max-width: 600px;
+            width: 100%;
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            box-sizing: border-box;
+        }
+        h1, h2 { text-align: center; margin-top: 0; }
+        .btn {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            width: 100%;
+            margin-top: 10px;
+            transition: opacity 0.2s;
+        }
+        .btn:hover { opacity: 0.9; }
+        .btn-sm {
+            width: auto; padding: 6px 12px; margin: 0; font-size: 13px; border-radius: 8px;
+            background: var(--card-bg); color: var(--text-color); border: 1px solid var(--border); cursor: pointer; font-weight: 700;
+        }
+        .btn-sm:hover { border-color: var(--accent); color: var(--accent); }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            margin: 8px 0;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--bg-color);
+            color: var(--text-color);
+            box-sizing: border-box;
+        }
+        .board {
+            display: grid;
+            grid-template-columns: repeat(15, 1fr);
+            gap: 2px;
+            background: var(--border);
+            padding: 2px;
+            border-radius: 8px;
+            margin: 15px auto;
+            max-width: 450px;
+            aspect-ratio: 1/1;
+        }
+        .cell {
+            background: var(--card-bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            user-select: none;
+        }
+        .cell.x { color: #ef4444; }
+        .cell.o { color: #3b82f6; }
+        .cell.win { background: rgba(34, 197, 94, 0.45); }
+        .hidden { display: none !important; }
+        .flex-row { display: flex; gap: 10px; }
+        .avatar-preview {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid var(--accent);
+            background: var(--bg-color);
+            flex-shrink: 0;
+        }
+
+        /* ===== Menu ☰ (nơi chứa Tạo phòng / Vào phòng / Admin) ===== */
+        .topbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+        .hamburger-btn {
+            width: 38px; height: 38px; border-radius: 8px; border: 1px solid var(--border);
+            background: var(--bg-color); color: var(--text-color); font-size: 18px; cursor: pointer; flex-shrink: 0;
+        }
+        .drawer-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 998; display: none;
+        }
+        .drawer-overlay.open { display: block; }
+        .drawer {
+            position: fixed; top: 0; left: 0; height: 100%; width: min(300px, 85vw);
+            background: var(--card-bg); border-right: 1px solid var(--border); z-index: 999;
+            transform: translateX(-100%); transition: transform .25s ease; padding: 16px; box-sizing: border-box;
+            overflow-y: auto; display: flex; flex-direction: column; gap: 14px;
+        }
+        .drawer.open { transform: translateX(0); }
+        .drawer-section-title { font-size: 12px; font-weight: 800; text-transform: uppercase; color: var(--accent); margin: 6px 0 0; }
+        .room-row {
+            display: flex; align-items: center; justify-content: space-between; gap: 6px;
+            background: var(--bg-color); border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; font-size: 12px;
+        }
+        .room-row .meta { display: flex; flex-direction: column; overflow: hidden; }
+        .room-row .meta b { font-family: monospace; font-size: 13px; }
+        .room-row .meta span { color: var(--text-color); opacity: .65; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .del-room-btn {
+            background: #ef4444; color: #fff; border: none; border-radius: 6px; padding: 5px 8px; cursor: pointer; font-size: 11px; flex-shrink: 0;
+        }
+
+        /* ===== Màn hình kết thúc ván: chơi lại / về sảnh ===== */
+        .endgame-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,.65); z-index: 997;
+            display: none; align-items: center; justify-content: center; padding: 20px;
+        }
+        .endgame-overlay.open { display: flex; }
+        .endgame-card {
+            background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; padding: 24px;
+            width: 100%; max-width: 340px; text-align: center; display: flex; flex-direction: column; gap: 12px;
+        }
+        .endgame-title { font-size: 26px; font-weight: 900; }
+        .endgame-title.win { color: #22c55e; }
+        .endgame-title.lose { color: #ef4444; }
+        .endgame-title.draw { color: #f59e0b; }
+    </style>
+</head>
+<body>
+
+    <div class="container" id="login-screen">
+        <h2>Cấu Hình Người Chơi v3.4</h2>
+        <label>Tên của bạn:</label>
+        <input type="text" id="player-name" placeholder="Nhập tên đại cá...">
+
+        <label>Quốc gia:</label>
+        <select id="player-country">
+            <option value="🇻🇳">🇻🇳 Việt Nam</option>
+            <option value="🇺🇸">🇺🇸 Mỹ</option>
+            <option value="🇯🇵">🇯🇵 Nhật Bản</option>
+            <option value="🇰🇷">🇰🇷 Hàn Quốc</option>
+        </select>
+
+        <label>Ảnh đại diện — không bắt buộc:</label>
+        <div class="flex-row" style="align-items: center;">
+            <img id="avatar-preview" class="avatar-preview" alt="Preview">
+            <button type="button" class="btn" style="margin:0;" onclick="document.getElementById('player-avatar-file').click()">🖼️ Chọn ảnh từ máy</button>
+            <button type="button" class="btn-sm" id="avatar-clear-btn" style="display:none;" onclick="clearAvatarPick()">✕</button>
+        </div>
+        <input type="file" id="player-avatar-file" accept="image/*" class="hidden">
+
+        <button class="btn" onclick="saveProfileAndLobby()">Vào Bàn Cờ</button>
+    </div>
+
+    <!-- Lớp phủ mở menu ☰ -->
+    <div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
+    <aside class="drawer" id="side-drawer">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <b>☰ Menu Phòng</b>
+            <button class="btn-sm" onclick="closeDrawer()">✕</button>
+        </div>
+
+        <div>
+            <div class="drawer-section-title">Tạo / Vào phòng</div>
+            <button class="btn" onclick="createRoom()">➕ Tạo Phòng Mới</button>
+            <input type="text" id="room-code-input" placeholder="Nhập mã phòng...">
+            <button class="btn" style="background:#10b981;" onclick="joinRoom()">🚪 Vào Phòng</button>
+        </div>
+
+        <div>
+            <div class="drawer-section-title" id="admin-trigger" ondblclick="showAdminKeyBox()" style="cursor:pointer; user-select:none;" title="Nhấp đúp để mở quản trị">🔒 Quản Trị</div>
+            <div id="admin-key-box-1" class="hidden" style="display:flex; gap:6px; margin-top:4px;">
+                <input type="password" id="admin-key-input-1" placeholder="Mã lớp 1..." style="margin:0;" onkeydown="if(event.key==='Enter')checkAdminKey1()">
+                <button class="btn-sm" onclick="checkAdminKey1()">Mở</button>
+            </div>
+            <div id="admin-key-box-2" class="hidden" style="display:flex; gap:6px; margin-top:4px;">
+                <input type="password" id="admin-key-input-2" placeholder="Mã lớp 2..." style="margin:0;" onkeydown="if(event.key==='Enter')checkAdminKey2()">
+                <button class="btn-sm" onclick="checkAdminKey2()">Mở</button>
+            </div>
+            <div id="admin-panel" class="hidden">
+                <div id="admin-room-list" style="display:flex; flex-direction:column; gap:6px; margin-top:6px;">
+                    <span style="font-size:12px; opacity:.6;">Đang tải...</span>
+                </div>
+                <button class="btn-sm" style="width:100%; margin-top:8px;" onclick="refreshAdminRoomList()">🔄 Làm mới danh sách</button>
+            </div>
+        </div>
+    </aside>
+
+    <div class="container hidden" id="game-screen">
+        <div class="topbar">
+            <button class="hamburger-btn" onclick="openDrawer()">☰</button>
+            <h3 id="room-title" style="margin:0; flex:1; text-align:center;">Chưa vào phòng</h3>
+            <button class="btn-sm" onclick="toggleTheme()">🌓</button>
+        </div>
+        <div id="game-status" style="text-align: center; font-weight: bold; margin: 10px 0;">Mở menu ☰ để tạo hoặc vào phòng.</div>
+
+        <div class="board" id="game-board"></div>
+        <button class="btn hidden" id="leave-room-btn" style="background: #ef4444;" onclick="leaveRoom()">🏠 Rời phòng (về trạng thái chờ)</button>
+    </div>
+
+    <!-- Màn hình kết thúc ván -->
+    <div class="endgame-overlay" id="endgame-overlay">
+        <div class="endgame-card">
+            <div class="endgame-title" id="endgame-title">—</div>
+            <div id="endgame-sub" style="opacity:.8; font-size:13px;"></div>
+            <button class="btn" onclick="rematchRoom()">🔄 Chơi lại (phòng này)</button>
+            <button class="btn" style="background:#64748b;" onclick="backToLobbyFromEndgame()">🏠 Về sảnh</button>
+        </div>
+    </div>
+
+<script>
+    // Cấu hình Firebase công khai mẫu cho dự án
+    const firebaseConfig = {
+        databaseURL: "https://caro-online-default-rtdb.asia-southeast1.firebasedatabase.app"
+    };
+    if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+    }
+    const db = firebase.database();
+    const PROFILE_KEY = 'caro_profile_v1';
+
+    let myData = {
+        name: "",
+        country: "🇻🇳",
+        avatar: "",
+        symbol: "X"
+    };
+    let currentRoomId = null;
+    let isMyTurn = false;
+    let mySymbol = "X";
+    let roomListenerRef = null;
+    let adminListRef = null;
+    let lastRoomStatus = null;
+
+    // Danh sách các icon / từ khóa nhạy cảm bị cấm tuyệt đối
+    const bannedKeywords = ["admin", "hack", "shit", "fuck", "lồn", "cặc", "cu", "đụ", "địt", "đéo", "cc", "vl", "vcl", "dm", "dkm", "💀", "🖕", "🔞", "💩"];
+
+    // Cập nhật preview avatar khi nhập link
+    // Lấy ảnh từ thư viện ảnh (điện thoại) hoặc duyệt file (PC) — không cần dán link.
+    document.getElementById('player-avatar-file').addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        if (!file.type.startsWith('image/')) { alert('Vui lòng chọn một tệp ảnh!'); return; }
+        if (file.size > 2 * 1024 * 1024) { alert('Ảnh quá lớn (>2MB), hãy chọn ảnh nhỏ hơn.'); return; }
+        const reader = new FileReader();
+        reader.onload = () => {
+            myData.avatar = reader.result; // data URL, dùng trực tiếp, không cần mạng
+            document.getElementById('avatar-preview').src = myData.avatar;
+            document.getElementById('avatar-clear-btn').style.display = 'inline-block';
+        };
+        reader.readAsDataURL(file);
+    });
+    function clearAvatarPick() {
+        myData.avatar = '';
+        document.getElementById('avatar-preview').src = '';
+        document.getElementById('player-avatar-file').value = '';
+        document.getElementById('avatar-clear-btn').style.display = 'none';
+    }
+
+    function sanitizeInput(text) {
+        let lower = text.toLowerCase();
+        for (let word of bannedKeywords) {
+            if (lower.includes(word)) {
+                return false; // Phát hiện từ hoặc icon cấm
+            }
+        }
+        return true;
+    }
+
+    /* Ghi nhớ tên/quốc gia/avatar: ô nhập BẮT ĐẦU trống (không có link mẫu dựng sẵn),
+       nhưng nếu máy đã từng lưu hồ sơ, tự điền lại để khỏi phải gõ tên mỗi lần vào. */
+    function loadRememberedProfile() {
+        let saved = null;
+        try { saved = JSON.parse(localStorage.getItem(PROFILE_KEY) || 'null'); } catch (e) {}
+        if (!saved) return;
+        if (saved.name) document.getElementById('player-name').value = saved.name;
+        if (saved.country) document.getElementById('player-country').value = saved.country;
+        if (saved.avatar) {
+            myData.avatar = saved.avatar;
+            document.getElementById('avatar-preview').src = saved.avatar;
+            document.getElementById('avatar-clear-btn').style.display = 'inline-block';
+        }
+    }
+    function rememberProfile(data) {
+        try { localStorage.setItem(PROFILE_KEY, JSON.stringify({ name: data.name, country: data.country, avatar: data.avatar })); } catch (e) {}
+    }
+    loadRememberedProfile();
+
+    function saveProfileAndLobby() {
+        let name = document.getElementById('player-name').value.trim();
+        let country = document.getElementById('player-country').value;
+        if (!name) {
+            alert('Vui lòng nhập tên của đại ca!');
+            return;
+        }
+
+        // Kiểm tra chống icon/từ ngữ xấu
+        if (!sanitizeInput(name)) {
+            alert('Tên chứa từ ngữ hoặc icon không hợp lệ / bị cấm!');
+            return;
+        }
+
+        myData.name = name;
+        myData.country = country;
+        // myData.avatar đã được gán sẵn khi người dùng chọn ảnh từ máy (nếu có), giữ nguyên tại đây.
+        rememberProfile(myData);
+
+        // Đăng nhập xong vào thẳng bàn cờ (không qua màn Sảnh riêng nữa).
+        // Tạo phòng / vào phòng / quản trị giờ nằm trong menu ☰.
+        document.getElementById('login-screen').classList.add('hidden');
+        document.getElementById('game-screen').classList.remove('hidden');
+        buildBoard();
+        refreshAdminRoomList();
+    }
+
+    /* ===== Menu ☰ ===== */
+    function openDrawer() {
+        document.getElementById('side-drawer').classList.add('open');
+        document.getElementById('drawer-overlay').classList.add('open');
+    }
+    function closeDrawer() {
+        document.getElementById('side-drawer').classList.remove('open');
+        document.getElementById('drawer-overlay').classList.remove('open');
+    }
+
+    function createRoom() {
+        let roomId = Math.floor(100000 + Math.random() * 900000).toString();
+        mySymbol = "X";
+
+        let roomData = {
+            status: "waiting",
+            board: Array(225).fill(""),
+            turn: "X",
+            winner: "",
+            playerX: myData,
+            playerO: null
+        };
+
+        db.ref('rooms/' + roomId).set(roomData).then(() => {
+            enterGameScreen(roomId);
+        }).catch(err => alert('Không tạo được phòng: ' + err.message));
+    }
+
+    function joinRoom() {
+        let roomId = document.getElementById('room-code-input').value.trim();
+        if (!roomId) {
+            alert('Vui lòng nhập mã phòng!');
+            return;
+        }
+
+        db.ref('rooms/' + roomId).once('value', (snapshot) => {
+            let room = snapshot.val();
+            if (!room) {
+                alert('Không tìm thấy phòng này!');
+                return;
+            }
+            if (room.playerO) {
+                alert('Phòng đã đầy người chơi!');
+                return;
+            }
+
+            mySymbol = "O";
+
+            db.ref('rooms/' + roomId).update({
+                status: "playing",
+                playerO: myData
+            }).then(() => {
+                enterGameScreen(roomId);
+            }).catch(err => alert('Không vào được phòng: ' + err.message));
+        }, err => alert('Lỗi kết nối: ' + err.message));
+    }
+
+    function enterGameScreen(roomId) {
+        currentRoomId = roomId;
+        closeDrawer();
+        document.getElementById('room-title').innerText = `Mã Phòng: ${roomId}`;
+        document.getElementById('leave-room-btn').classList.remove('hidden');
+        buildBoard();
+        listenRoom(roomId);
+    }
+
+    function buildBoard() {
+        const boardEl = document.getElementById('game-board');
+        boardEl.innerHTML = "";
+        for (let i = 0; i < 225; i++) {
+            let cell = document.createElement('div');
+            cell.className = 'cell';
+            cell.dataset.index = i;
+            cell.onclick = () => makeMove(i);
+            boardEl.appendChild(cell);
+        }
+    }
+
+    /* Kiểm tra 5 quân liên tiếp (ngang / dọc / 2 đường chéo) trên bàn 15x15 (board là mảng phẳng 225 ô). */
+    const CARO_SIZE = 15;
+    function checkWin5(boardArr, index, symbol) {
+        const r0 = Math.floor(index / CARO_SIZE), c0 = index % CARO_SIZE;
+        const dirs = [[0, 1], [1, 0], [1, 1], [1, -1]];
+        for (const [dr, dc] of dirs) {
+            let cells = [[r0, c0]];
+            for (const sgn of [1, -1]) {
+                let i = 1;
+                while (true) {
+                    const r = r0 + dr * i * sgn, c = c0 + dc * i * sgn;
+                    if (r < 0 || r >= CARO_SIZE || c < 0 || c >= CARO_SIZE) break;
+                    if (boardArr[r * CARO_SIZE + c] !== symbol) break;
+                    cells.push([r, c]); i++;
+                }
+            }
+            if (cells.length >= 5) return cells.map(([r, c]) => r * CARO_SIZE + c);
+        }
+        return null;
+    }
+
+    function listenRoom(roomId) {
+        if (roomListenerRef) roomListenerRef.off();
+        roomListenerRef = db.ref('rooms/' + roomId);
+        lastRoomStatus = null;
+        roomListenerRef.on('value', (snapshot) => {
+            let room = snapshot.val();
+            if (!room) {
+                // Phòng vừa bị admin xoá trong lúc đang chơi.
+                if (currentRoomId === roomId) {
+                    alert('Phòng này đã bị xoá (có thể do quản trị).');
+                    backToIdleState();
+                }
+                return;
+            }
+
+            let cells = document.querySelectorAll('#game-board .cell');
+            room.board.forEach((val, idx) => {
+                cells[idx].innerText = val;
+                cells[idx].className = `cell ${val ? val.toLowerCase() : ''}`;
+            });
+
+            isMyTurn = (room.turn === mySymbol && room.status === "playing");
+
+            let statusText = document.getElementById('game-status');
+            if (room.status === "waiting") {
+                statusText.innerText = "Đang đợi đối thủ vào phòng...";
+            } else if (room.status === "playing") {
+                statusText.innerText = isMyTurn ? "Đến lượt đại ca đi!" : "Đợi đối thủ đi nước tiếp theo...";
+            } else if (room.status === "finished" || room.status === "draw") {
+                statusText.innerText = "Ván đấu đã kết thúc.";
+            }
+
+            // Tô xanh 5 quân thắng (nếu có lưu winLine) và chỉ mở bảng kết thúc đúng 1 lần khi status vừa đổi.
+            if (room.winLine) room.winLine.forEach(i => { if (cells[i]) cells[i].classList.add('win'); });
+            if ((room.status === "finished" || room.status === "draw") && lastRoomStatus !== room.status) {
+                showEndgame(room);
+            }
+            lastRoomStatus = room.status;
+        });
+    }
+
+    function makeMove(index) {
+        if (!isMyTurn || !currentRoomId) return;
+
+        db.ref(`rooms/${currentRoomId}`).once('value', (snapshot) => {
+            let room = snapshot.val();
+            if (!room || room.board[index] !== "" || room.status !== "playing") return;
+
+            let board = room.board.slice();
+            board[index] = mySymbol;
+            const winLine = checkWin5(board, index, mySymbol);
+            const isDraw = !winLine && board.every(v => v !== "");
+            let updates = { board: board };
+
+            if (winLine) {
+                updates.status = "finished";
+                updates.winner = mySymbol;
+                updates.winLine = winLine;
+            } else if (isDraw) {
+                updates.status = "draw";
+            } else {
+                updates.turn = mySymbol === "X" ? "O" : "X";
+            }
+
+            db.ref(`rooms/${currentRoomId}`).update(updates);
+        });
+    }
+
+    /* ===== Kết thúc ván: chơi lại trong phòng này, hoặc về sảnh (trạng thái chờ) ===== */
+    function showEndgame(room) {
+        const title = document.getElementById('endgame-title');
+        const sub = document.getElementById('endgame-sub');
+        if (room.status === "draw") {
+            title.textContent = '🤝 HÒA'; title.className = 'endgame-title draw';
+            sub.textContent = 'Bàn cờ đã đầy, không ai thắng.';
+        } else if (room.winner === mySymbol) {
+            title.textContent = '🏆 THẮNG'; title.className = 'endgame-title win';
+            sub.textContent = 'Chúc mừng đại ca đã thắng ván này!';
+        } else {
+            title.textContent = '😵 THUA'; title.className = 'endgame-title lose';
+            sub.textContent = 'Đối thủ đã thắng ván này.';
+        }
+        document.getElementById('endgame-overlay').classList.add('open');
+    }
+    function hideEndgame() {
+        document.getElementById('endgame-overlay').classList.remove('open');
+    }
+
+    function rematchRoom() {
+        hideEndgame();
+        if (!currentRoomId) return;
+        // Chơi lại CÙNG phòng: giữ nguyên 2 người chơi, chỉ reset bàn cờ. X luôn đi trước ván mới.
+        db.ref(`rooms/${currentRoomId}`).update({
+            board: Array(225).fill(""),
+            status: "playing",
+            turn: "X",
+            winner: "",
+            winLine: null
+        }).catch(err => alert('Không chơi lại được: ' + err.message));
+    }
+
+    function backToLobbyFromEndgame() {
+        hideEndgame();
+        leaveRoom();
+    }
+
+    /* Rời phòng: CHỈ rời đi, KHÔNG xoá phòng khỏi hệ thống (để khỏi ảnh hưởng đối thủ còn trong phòng).
+       Xoá phòng là việc riêng của Quản trị trong menu ☰. */
+    function leaveRoom() {
+        hideEndgame();
+        if (roomListenerRef) { roomListenerRef.off(); roomListenerRef = null; }
+        backToIdleState();
+    }
+    function backToIdleState() {
+        currentRoomId = null;
+        document.getElementById('room-title').innerText = 'Chưa vào phòng';
+        document.getElementById('game-status').innerText = 'Mở menu ☰ để tạo hoặc vào phòng.';
+        document.getElementById('leave-room-btn').classList.add('hidden');
+        buildBoard();
+        refreshAdminRoomList();
+    }
+
+    /* ===== Khoá quản trị: ẩn mặc định, nhấp đúp vào nhãn "🔒 Quản Trị" mới hiện ô nhập mã,
+       nhập đúng mã mới lộ danh sách phòng + nút xoá. Đổi mã tại đây. ===== */
+    // Khoá quản trị 2 lớp — Team Gooke: lớp 1 "GOOKE Dev", lớp 2 "admin". Đổi mã tại đây.
+    const ADMIN_KEY_1 = 'GOOKE Dev';
+    const ADMIN_KEY_2 = 'admin';
+    let adminUnlocked = false;
+    function showAdminKeyBox() {
+        if (adminUnlocked) return;
+        document.getElementById('admin-key-box-1').classList.remove('hidden');
+        document.getElementById('admin-key-input-1').focus();
+    }
+    function checkAdminKey1() {
+        const val = document.getElementById('admin-key-input-1').value;
+        if (val !== ADMIN_KEY_1) { alert('Sai mã lớp 1!'); return; }
+        document.getElementById('admin-key-box-1').classList.add('hidden');
+        document.getElementById('admin-key-input-1').value = '';
+        document.getElementById('admin-key-box-2').classList.remove('hidden');
+        document.getElementById('admin-key-input-2').focus();
+    }
+    function checkAdminKey2() {
+        const val = document.getElementById('admin-key-input-2').value;
+        if (val !== ADMIN_KEY_2) { alert('Sai mã lớp 2!'); return; }
+        adminUnlocked = true;
+        document.getElementById('admin-key-box-2').classList.add('hidden');
+        document.getElementById('admin-key-input-2').value = '';
+        document.getElementById('admin-trigger').textContent = '🔓 Quản Trị';
+        document.getElementById('admin-panel').classList.remove('hidden');
+        refreshAdminRoomList();
+    }
+
+    /* ===== Quản trị: liệt kê TẤT CẢ phòng, xoá TỪNG phòng một theo mã (không xoá hết cùng lúc) ===== */
+    function refreshAdminRoomList() {
+        if (!adminUnlocked) return;
+        const box = document.getElementById('admin-room-list');
+        box.innerHTML = '<span style="font-size:12px; opacity:.6;">Đang tải...</span>';
+        db.ref('rooms').once('value', (snapshot) => {
+            const rooms = snapshot.val() || {};
+            const ids = Object.keys(rooms);
+            if (!ids.length) { box.innerHTML = '<span style="font-size:12px; opacity:.6;">Chưa có phòng nào.</span>'; return; }
+            box.innerHTML = '';
+            ids.forEach(id => {
+                const r = rooms[id] || {};
+                const row = document.createElement('div');
+                row.className = 'room-row';
+                const meta = document.createElement('div');
+                meta.className = 'meta';
+                const b = document.createElement('b'); b.textContent = id;
+                const sp = document.createElement('span');
+                const xName = r.playerX ? r.playerX.name : '?';
+                const oName = r.playerO ? r.playerO.name : '(trống)';
+                sp.textContent = `${r.status || '?'} · X:${xName} vs O:${oName}`;
+                meta.appendChild(b); meta.appendChild(sp);
+                const delBtn = document.createElement('button');
+                delBtn.className = 'del-room-btn';
+                delBtn.textContent = '🗑 Xoá';
+                delBtn.onclick = () => deleteOneRoom(id);
+                row.appendChild(meta); row.appendChild(delBtn);
+                box.appendChild(row);
+            });
+        }, err => { box.innerHTML = '<span style="font-size:12px; color:#ef4444;">Lỗi tải danh sách: ' + err.message + '</span>'; });
+    }
+
+    // Xoá ĐÚNG MỘT phòng theo mã — không bao giờ xoá toàn bộ node 'rooms'.
+    function deleteOneRoom(roomId) {
+        if (!confirm(`Xoá phòng ${roomId}? Hành động này không thể hoàn tác.`)) return;
+        db.ref('rooms/' + roomId).remove().then(() => {
+            if (currentRoomId === roomId) backToIdleState();
+            refreshAdminRoomList();
+        }).catch(err => alert('Không xoá được phòng: ' + err.message));
+    }
+
+    function toggleTheme() {
+        let current = document.documentElement.getAttribute('data-theme');
+        document.documentElement.setAttribute('data-theme', current === 'dark' ? 'light' : 'dark');
+    }
+
+    // Chống F12 và chuột phải
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J' || e.key === 'C')) || (e.ctrlKey && (e.key === 'U' || e.key === 's' || e.key === 'S'))) {
+            e.preventDefault();
+            return false;
+        }
+    });
+    document.addEventListener('contextmenu', e => e.preventDefault());
+</script>
+</body>
+</html>
